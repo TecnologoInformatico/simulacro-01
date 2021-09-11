@@ -1,0 +1,124 @@
+#!/bin/bash
+# ==============================================================================
+# Se le pasará como argumento un directorio, en caso de no existir debe crearlo. 
+# En dicho directorio iniciará un nuevo repositorio git, creará un archivo README.md 
+# donde el título será el pasado en los argumentos 
+# o en caso de no haber sido pasado como un argumento el nombre del directorio.
+# USO: mkgit -d directorio [-t titulo]
+# ==============================================================================
+
+directorio=''
+titulo=''
+
+# Función para mostrar la ayuda
+# De este modo se puede mostrar el mismo mensaje sin tener que reescribir el mismo código.
+mostrar_ayuda() {
+    echo "Uso: mkgit -d directorio [-t titulo]
+    Opciones:
+      -d, --directorio: directorio donde se creará el repositorio
+      -t, --titulo: titulo del archivo README.md
+    "
+    if [ $1 -eq 2 ]; then
+        echo "Los códigos de error retornados son:
+        - 1 Argumentos incorrectos.
+        - 2 No se pudo crear el directorio.
+        - 3 El directorio no está vacío.
+        - 4 No se pudo inicializar el repositorio.
+        "
+    fi
+}
+# Función para mostrar el error
+mostrar_error() {
+    mensaje_error=${1:-'Ocurrió un error inesperado.'}
+    echo "ERROR: $mensaje_error" >&2
+}
+
+if [ $# -eq 0 ]; then
+    mostrar_error 'No se pasaron argumentos.'
+    mostrar_ayuda
+    exit 1
+fi
+
+# Obtener los argumentos
+# Si se encuentra una de las opciones disponibles se utiliza el valor del siguiente argumento
+# mediante el uso del builtin "shift".
+while [[ -n "$1" ]]; do
+    case $1 in
+        -d|--directorio)
+            shift
+            directorio="$1"
+            ;;
+        -t|--titulo)
+            shift
+            titulo="$1"
+            ;;
+        --help)
+            mostrar_ayuda 2
+            exit 0
+            ;;
+        *)
+            mostrar_error "Argumento desconocido: $1"
+            mostrar_ayuda
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Chequea que se haya pasado un directorio como argumento
+if [ -z "$directorio" ]; then
+    mostrar_error 'No se pasó un directorio como argumento.'
+    mostrar_ayuda
+    exit 1
+fi
+# Si el titulo no se pasó como argumento se utiliza el nombre del directorio
+titulo=${titulo:-$directorio}
+
+# Si el directorio no existe lo crea
+if [ ! -d "$directorio" ]; then
+    mkdir "$directorio"
+    if [ $? -ne 0 ]; then
+        mostrar_error 'No se pudo crear el directorio.'
+        exit 2
+    fi
+elif [ -n "$(ls -A "$directorio")" ]; # Si el directorio no está vacío se muestra un error
+then
+    mostrar_error 'El directorio no está vacío.'
+    exit 3
+fi
+
+# Se mueve al directorio e inicializa el repositorio
+cd "$directorio"
+git init &> /dev/null # Se utiliza el comando "&> /dev/null" 
+# para no mostrar la salida estandar 
+# ni el error en caso de que no se pueda inicializar el repositorio.
+if [ $? -ne 0 ]; then
+    mostrar_error 'No se pudo inicializar el repositorio.'
+    exit 4
+fi
+
+# Se crea el archivo README.md
+echo "# $titulo" > README.md
+# Se agrega el archivo README.md al repositorio
+git add README.md
+# Se hace commit
+git commit -m "Inicialización del repositorio" &> /dev/null
+# Se chequea que el commit se haya realizado correctamente
+if [ $? -ne 0 ]; then
+    mostrar_error 'No se pudo hacer commit.'
+    exit 5
+fi
+
+# Se muestra el resultado
+echo "
+==============================================================================
+        🥳 Se creó el repositorio con éxito en: 
+    $PWD
+==============================================================================
+"
+
+# retornamos al directorio inicial
+cd - > /dev/null
+
+# Finalizamos el script
+exit 0
